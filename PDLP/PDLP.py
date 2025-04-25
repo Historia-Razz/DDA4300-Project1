@@ -4,138 +4,13 @@ from ortools.linear_solver import pywraplp
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.cm import get_cmap
-from Project1_Code.PDLP.Sampling import load_sample_hdf5
-
-def make_gaussian_samples(n_dists=3,
-                          n_points=30,
-                          dim=2,
-                          seed=0):
-    """生成 N 个高斯分布的(坐标, 权重)."""
-    rng = np.random.default_rng(seed)
-    dists = []
-    for _ in range(n_dists):
-        # 随机均值、方差（独立坐标）
-        mean = rng.uniform(-5, 5, size=dim)
-        std = rng.uniform(0.3, 1.0, size=dim)
-        pts = rng.normal(mean, std, size=(n_points, dim))
-        # 这里用均匀权重；如需自定义可自行替换
-        w = np.full(n_points, 1.0 / n_points)
-        dists.append((pts, w))
-    return dists
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from Sampling.Sampling import load_sample_hdf5
 
 
-def barycenter_lp_matrices(distributions, remove_redundant=True):
-    """给定离散分布列表，构造 Wasserstein barycenter 线性规划."""
-    # === 预设重心支持点 ===
-    # 这里用所有输入分布的并集；也可先做 k‑means 压缩
-    """
-    Build the (A, b, c) matrices of the pre-specified-support
-    Wasserstein barycenter LP in standard form  (min c^T x  s.t.  Ax=b, x>=0).
-
-    Parameters
-    ----------
-    distributions : list[(pts, a)]
-        pts : (m_t, d) ndarray – support of μ_t
-        a   : (m_t,)    ndarray – weights, sum(a)=1
-    remove_redundant : bool, default True
-        If True, drop the (M + k·m + 1)-th rows described in Lemma 3.1
-        so that the final matrix has full row-rank.
-
-    Returns
-    -------
-    A : scipy.sparse.csr_matrix   (n_row, n_col)
-    b : (n_row,)  ndarray
-    c : (n_col,)  ndarray
-    meta : dict   – helpful sizes / index offsets
-    """
-    # ---------- basic sizes ----------
-    support = np.vstack([pts for pts, _ in distributions])
-    m = len(support)  # 重心支持点数量
-    N = len(distributions)
-    m_t = [len(a) for _, a in distributions]     # m_1,…,m_N
-    M = sum(m_t)                               # ∑ m_i
-    n_col = sum(mi * m for mi in m_t) + m          # |Π| + |w|
-    n_row = N * m + M + 1                          # before redundancy removal
-
-
-    # convenient offsets ----------------------------------------------------
-    pi_start = np.zeros(N+1, dtype=int)
-    for t in range(N):
-        pi_start[t+1] = pi_start[t] + m_t[t]*m       # length of vec(Π^(t))
-    w_offset = pi_start[-1]                          # first index of w variables
-
-    # ---------- build c ----------------------------------------------------
-    c = np.zeros(n_col)
-    for t, (pts_t, _) in enumerate(distributions):
-        for i in range(m):
-            dists = np.sum((support[i] - pts_t)**2, axis=1)   # (m_t,)
-            j_idx = np.arange(m_t[t])
-            var_idx = pi_start[t] + i*m_t[t] + j_idx
-            c[var_idx] = dists
-
-    # w-part of c is already zero
-
-    # ---------- build sparse A, b ------------------------------------------
-    data, rows, cols = [], [], []
-    b = np.zeros(n_row)
-
-    row_ptr = 0
-
-    # (1)  Σ_j Π_{ij}^{(t)}  - w_i = 0    ----  N·m rows
-    for t in range(N):
-        mi = m_t[t]
-        for i in range(m):
-            # Π block
-            j_idx = np.arange(mi)
-            cols.extend(pi_start[t] + i*mi + j_idx)
-            rows.extend([row_ptr]*mi)
-            data.extend([1.0]*mi)
-            # -w_i
-            cols.append(w_offset + i)
-            rows.append(row_ptr)
-            data.append(-1.0)
-            row_ptr += 1                     # advance to next row
-
-    # (2)  Σ_i Π_{ij}^{(t)} = a_j^(t)       ----  M rows
-    for t, (_, a_t) in enumerate(distributions):
-        mi = m_t[t]
-        for j in range(mi):
-            i_idx = np.arange(m)
-            cols.extend(pi_start[t] + i_idx*mi + j)
-            rows.extend([row_ptr]*m)
-            data.extend([1.0]*m)
-            b[row_ptr] = a_t[j]
-            row_ptr += 1
-
-    # (3)  Σ_i w_i = 1                      ----  1 row
-    cols.extend(w_offset + np.arange(m))
-    rows.extend([row_ptr]*m)
-    data.extend([1.0]*m)
-    b[row_ptr] = 1.0
-    row_ptr += 1
-
-    # 组装完整约束矩阵
-    A_full = sparse.csr_matrix((data, (rows, cols)), shape=(n_row, n_col))
-
-    # ---------- 根据 Lemma 3.1 删除冗余行 ----------
-    if remove_redundant:
-        M = sum(m_t)  # 质量守恒约束的总行数
-        rows_to_remove = [M + t * m for t in range(N)]  # 待删除的行索引
-        
-        keep = np.ones(n_row, dtype=bool)
-        keep[rows_to_remove] = False  # 标记删除行
-        
-        A = A_full[keep]
-        b = b[keep]
-    else:
-        A = A_full
-
-    meta = dict(N=N, m=m, m_t=m_t, n_row=A.shape[0], n_col=n_col,
-                pi_start=pi_start, w_offset=w_offset, support=support)
-    return A, b, c, meta
-
-
-def solve_barycenter_lp(distributions, solver_name="PDLP", verbose=True):
+def solve_barycenter_lp(distributions, A, b, c, meta, solver_name="PDLP", verbose=True):
     """求解 Wasserstein barycenter 线性规划问题。
     
     Args:
@@ -148,9 +23,7 @@ def solve_barycenter_lp(distributions, solver_name="PDLP", verbose=True):
         weights: 重心权重
         transport_matrices: 运输矩阵列表
     """
-    # 获取线性规划矩阵
-    A, b, c, meta = barycenter_lp_matrices(distributions)
-    
+
     # 创建求解器
     solver = pywraplp.Solver.CreateSolver(solver_name)
     if not solver:
@@ -349,7 +222,7 @@ if __name__ == "__main__":
     dists, A, b, c, meta = load_sample_hdf5("sample_001.h5")
     # used seed:
     # 42, 40, 2259， 1605
-    support, weights, transport_matrices = solve_barycenter_lp(dists)
+    support, weights, transport_matrices = solve_barycenter_lp(dists, A, b, c, meta)
     
     # 使用两种不同的可视化方法
     print("\n方法1:基础可视化")
