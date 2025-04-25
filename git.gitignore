@@ -1,0 +1,17 @@
+# 忽略所有文件
+*
+
+# 但保留以下文件和文件夹
+!Project1_Code/
+!Project1_Code/Sampling/
+!Project1_Code/Sampling/sample/
+!Project1_Code/Sampling/Sampling.py
+!Project1_Code/Sampling/what_sample.md
+!Project1_Code/PDLP/
+!Project1_Code/PDLP/PDLP照片/
+!Project1_Code/Approach3/
+!Project1_Code/Approach3/approach3_skinkhorn_free_support.py
+
+# 可选：忽略隐藏系统文件
+.DS_Store
+Thumbs.db
