@@ -152,6 +152,23 @@ Project1_HW_Submission/
 │   ├── maa_mean_max_min.m
 │   └── sinkhorn_barycenter_project_adaptive(1).m
 │
+├── Reference/                              # Research papers and references
+│   ├── PDLP/                              # Primal-Dual Linear Programming
+│   │   ├── Applegate 等 - 2025 - PDLP A Practical First-Order Method for Large-Scale Linear Programming.pdf
+│   │   ├── Applegate 等 - 2022 - Practical Large-Scale Linear Programming using Primal-Dual Hybrid Gradient.pdf
+│   │   └── Ge 等 - 2020 - Interior-Point Methods Strike Back Solving the Wasserstein Barycenter Problem.pdf
+│   ├── MAAIPM/                             # Modified Augmented Algorithmic Interior Point Method
+│   │   └── Ge 等 - 2020 - Interior-Point Methods Strike Back Solving the Wasserstein Barycenter Problem.pdf
+│   ├── IPM-SLRM/                           # Interior-Point with Symmetric Low-Rank Method
+│   │   └── Ge 等 - 2020 - Interior-Point Methods Strike Back Solving the Wasserstein Barycenter Problem.pdf
+│   └── Sinkhorn/                           # Sinkhorn Algorithm papers
+│       ├── Cuturi - 2013 - Sinkhorn Distances Lightspeed Computation of Optimal Transportation Distances.pdf
+│       └── Cuturi和Doucet - 2014 - Fast Computation of Wasserstein Barycenters.pdf
+│
+├── Project_Specification/                   # Original project assignment PDF
+│   └── project1-Computing Wasserstein Barycenter via Linear Programming.pdf
+│
+├── README.md
 └── .gitignore
 ```
 
