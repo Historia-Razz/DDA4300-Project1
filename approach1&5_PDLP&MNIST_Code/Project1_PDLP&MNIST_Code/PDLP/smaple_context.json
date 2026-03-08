@@ -1,0 +1,6 @@
+{
+    "count": 100,
+    "description": "100 synthetic barycenter LP datasets with Gaussian input",
+    "samples": ["sample_000.h5", "sample_001.h5", "sample_002.h5", "sample_003.h5"]
+  }
+  
