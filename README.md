@@ -2,7 +2,7 @@
 
 > **Course:** DDA4300 - Optimization Methods in Machine Learning
 >
-> **Institution:** Lingnan University (LGU)
+> **Institution:** CUHKSZ
 >
 > **Topic:** Wasserstein Barycenter Computation
 
